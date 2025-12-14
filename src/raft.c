@@ -99,6 +99,10 @@ void raft_become_candidate(raft_t *r) {
 
     // Send RequestVote to all peers (used in raft_election.c)
     raft_send_requestvote_all(r);
+    int majority = (r->num_nodes / 2) + 1;
+    if (r->votes_received >= majority) {
+        raft_become_leader(r);
+    }
 }
 
 void raft_become_leader(raft_t *r) {
