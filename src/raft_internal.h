@@ -122,4 +122,16 @@ uint64_t raft_log_last_term(const raft_log_t *log);
 uint64_t raft_log_first_index(const raft_log_t *log);
 int raft_log_is_empty(const raft_log_t *log);
 
+// ============================================================================
+// Replication (raft_replication.c)
+// ============================================================================
+
+void raft_send_heartbeats(raft_t *r);
+
+// ============================================================================
+// Election (raft_election.c)
+// ============================================================================
+
+void raft_send_requestvote_all(raft_t *r);
+
 #endif // RAFT_INTERNAL_H
