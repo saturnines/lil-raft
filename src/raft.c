@@ -98,7 +98,6 @@ void raft_become_candidate(raft_t *r) {
     }
 
     // Send RequestVote to all peers (used in raft_election.c)
-    extern void raft_send_requestvote_all(raft_t *r);
     raft_send_requestvote_all(r);
 }
 
@@ -120,7 +119,6 @@ void raft_become_leader(raft_t *r) {
     }
 
     // Send immediate heartbeat (implemented in raft_replication.c)
-    extern void raft_send_heartbeats(raft_t *r);
     raft_send_heartbeats(r);
 }
 
