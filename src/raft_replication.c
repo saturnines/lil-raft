@@ -279,6 +279,12 @@ int raft_propose(raft_t *r, const void *data, size_t len) {
     r->peers[r->my_id].match_index = index;
     r->peers[r->my_id].next_index = index + 1;
 
+
+    // This is such a lazy fix but it will work for single node clusters.
+    if (r->num_nodes == 1) {
+        r->commit_index = index;
+    }
+
     // Send AppendEntries immediately
     raft_send_heartbeats(r);
 
