@@ -9,11 +9,11 @@
 #include <time.h>
 #include <stdio.h>
 
-// Election timeout range: 150-300ms (from Raft paper)
+// Election timeout range: 150-300ms
 #define ELECTION_TIMEOUT_MIN_MS  150
 #define ELECTION_TIMEOUT_MAX_MS  300
 
-// Heartbeat interval: 50ms (much less than election timeout)
+// Heartbeat interval: 50ms
 #define HEARTBEAT_INTERVAL_MS    50
 
 // ============================================================================
