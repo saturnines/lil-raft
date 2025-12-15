@@ -50,11 +50,21 @@ typedef struct {
 // Log Entry
 // ============================================================================
 
+/**
+ * Entry types for distinguishing regular writes from control entries
+ */
+typedef enum {
+    RAFT_ENTRY_DATA = 0,    // Normal client data
+    RAFT_ENTRY_NOOP = 1,    // Noop for read synchronization
+    RAFT_ENTRY_CONFIG = 2,  // Configuration change
+} raft_entry_type_t;
+
 typedef struct {
-    uint64_t index;  // Raft log index
-    uint64_t term;   // Term when entry was received by leader
-    void *data;      // User data (payload)
-    size_t len;      // Data length
+    uint64_t index;          // Raft log index
+    uint64_t term;           // Term when entry was received by leader
+    raft_entry_type_t type;  // Entry type (DATA, NOOP, CONFIG)
+    void *data;              // User data (payload, NULL for NOOP)
+    size_t len;              // Data length (0 for NOOP)
 } raft_entry_t;
 
 // ============================================================================
@@ -143,10 +153,14 @@ typedef struct {
      * Apply committed entry to state machine
      * Called when entry is committed (in order, once per entry)
      *
+     * For NOOP entries (type == RAFT_ENTRY_NOOP), data is NULL and len is 0.
+     * The state machine should not modify state for NOOPs but may use them
+     * as synchronization points (e.g., for Lazy-ALR read optimization).
+     *
      * @return 0 on success, non-zero on error
      */
     int (*apply_entry)(void *ctx, uint64_t index, uint64_t term,
-                      const void *data, size_t len);
+                      raft_entry_type_t type, const void *data, size_t len);
 
     /**
      * Apply multiple committed entries (optional optimization)
