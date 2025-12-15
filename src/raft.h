@@ -145,6 +145,49 @@ int raft_read_index(raft_t *r, uint64_t *read_index);
 int raft_barrier(raft_t *r);
 
 // ============================================================================
+// Advanced Read Operations
+// ============================================================================
+
+/**
+ * Propose NOOP entry for read synchronization
+ *
+ * Appends a NOOP entry to log and returns its index.
+ * When this index is applied, reads are guaranteed linearizable.
+ *
+ * Useful for implementing optimized read paths that need occasional
+ * synchronization with the log without going through full consensus.
+ * Multiple concurrent reads can share one NOOP.
+ *
+ * @param sync_index Output: index of NOOP entry
+ * @return RAFT_OK if accepted
+ *         RAFT_ERR_NOT_LEADER if not leader
+ */
+int raft_propose_noop(raft_t *r, uint64_t *sync_index);
+
+/**
+ * Check if index has been applied locally
+ *
+ * Used to wait for operations to be reflected in local state machine.
+ *
+ * @param index Index to check
+ * @return 1 if applied, 0 if not yet applied
+ */
+int raft_is_applied(const raft_t *r, uint64_t index);
+
+/**
+ * Get commit and applied indexes atomically
+ *
+ * Useful for implementing read optimizations that need to check
+ * if the node is caught up with committed state.
+ *
+ * @param commit_index Output: current commit index
+ * @param applied_index Output: current applied index
+ */
+void raft_get_indexes(const raft_t *r,
+                      uint64_t *commit_index,
+                      uint64_t *applied_index);
+
+// ============================================================================
 // RPC Handlers (called when receiving network messages)
 // ============================================================================
 
