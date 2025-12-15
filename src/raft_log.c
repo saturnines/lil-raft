@@ -121,8 +121,76 @@ int raft_log_append(raft_log_t *log, uint64_t term,
     // Add entry
     log->entries[log->count].index = index;
     log->entries[log->count].term = term;
+    log->entries[log->count].type = RAFT_ENTRY_DATA;
     log->entries[log->count].data = data_copy;
     log->entries[log->count].len = len;
+    log->count++;
+
+    return RAFT_OK;
+}
+
+/**
+ * Append a NOOP entry
+ */
+int raft_log_append_noop(raft_log_t *log, uint64_t term) {
+    if (!log) {
+        return RAFT_ERR_INVALID_ARG;
+    }
+
+    // Ensure capacity
+    int ret = ensure_capacity(log, log->count + 1);
+    if (ret != RAFT_OK) {
+        return ret;
+    }
+
+    // Calculate index
+    uint64_t index = offset_to_index(log, log->count);
+
+    // Add NOOP entry (no data)
+    log->entries[log->count].index = index;
+    log->entries[log->count].term = term;
+    log->entries[log->count].type = RAFT_ENTRY_NOOP;
+    log->entries[log->count].data = NULL;
+    log->entries[log->count].len = 0;
+    log->count++;
+
+    return RAFT_OK;
+}
+
+/**
+ * Append an entry preserving its type (used for follower replication)
+ */
+int raft_log_append_entry(raft_log_t *log, const raft_entry_t *entry) {
+    if (!log || !entry) {
+        return RAFT_ERR_INVALID_ARG;
+    }
+
+    // Ensure capacity
+    int ret = ensure_capacity(log, log->count + 1);
+    if (ret != RAFT_OK) {
+        return ret;
+    }
+
+    void *data_copy = NULL;
+
+    // Only copy data for non NOOP entries
+    if (entry->type != RAFT_ENTRY_NOOP && entry->data && entry->len > 0) {
+        data_copy = malloc(entry->len);
+        if (!data_copy) {
+            return RAFT_ERR_NOMEM;
+        }
+        memcpy(data_copy, entry->data, entry->len);
+    }
+
+    // Calculate index
+    uint64_t index = offset_to_index(log, log->count);
+
+    // Add entry preserving type
+    log->entries[log->count].index = index;
+    log->entries[log->count].term = entry->term;
+    log->entries[log->count].type = entry->type;
+    log->entries[log->count].data = data_copy;
+    log->entries[log->count].len = entry->len;
     log->count++;
 
     return RAFT_OK;
@@ -143,18 +211,23 @@ int raft_log_append_batch(raft_log_t *log,
 
     // Append each entry
     for (size_t i = 0; i < count; i++) {
-        void *data_copy = malloc(entries[i].len);
-        if (!data_copy) {
-            // Rollback on OOM
-            // (entries already appended stay - caller must handle)
-            return RAFT_ERR_NOMEM;
+        void *data_copy = NULL;
+
+        // Only copy data for non NOOP entries
+        if (entries[i].type != RAFT_ENTRY_NOOP && entries[i].data && entries[i].len > 0) {
+            data_copy = malloc(entries[i].len);
+            if (!data_copy) {
+                // Rollback on OOM
+                return RAFT_ERR_NOMEM;
+            }
+            memcpy(data_copy, entries[i].data, entries[i].len);
         }
-        memcpy(data_copy, entries[i].data, entries[i].len);
 
         uint64_t index = offset_to_index(log, log->count);
 
         log->entries[log->count].index = index;
         log->entries[log->count].term = entries[i].term;
+        log->entries[log->count].type = entries[i].type;
         log->entries[log->count].data = data_copy;
         log->entries[log->count].len = entries[i].len;
         log->count++;
