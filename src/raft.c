@@ -2,6 +2,8 @@
  * raft.c - Core Raft state machine
  */
 
+#define _POSIX_C_SOURCE 199309L
+
 #include "raft_internal.h"
 #include "raft_errors.h"
 #include <stdlib.h>
@@ -258,6 +260,7 @@ void raft_tick(raft_t *r) {
             r->callbacks.apply_entry(r->callback_ctx,
                                     entry->index,
                                     entry->term,
+                                    entry->type,
                                     entry->data,
                                     entry->len);
         }
@@ -290,4 +293,26 @@ int raft_get_leader_id(const raft_t *r) {
 
 int raft_get_node_id(const raft_t *r) {
     return r ? r->my_id : -1;
+}
+
+// ============================================================================
+// ALR's Read Operations
+// ============================================================================
+
+int raft_is_applied(const raft_t *r, uint64_t index) {
+    if (!r) return 0;
+    return r->last_applied >= index;
+}
+
+void raft_get_indexes(const raft_t *r,
+                      uint64_t *commit_index,
+                      uint64_t *applied_index) {
+    if (!r) {
+        if (commit_index) *commit_index = 0;
+        if (applied_index) *applied_index = 0;
+        return;
+    }
+
+    if (commit_index) *commit_index = r->commit_index;
+    if (applied_index) *applied_index = r->last_applied;
 }
