@@ -125,9 +125,8 @@ int raft_recv_appendentries(raft_t *r,
         }
 
         if (!existing) {
-            // Append to in mem log
-            raft_log_append(&r->log, entries[i].term,
-                           entries[i].data, entries[i].len);
+            // Append to in-memory log (preserves entry type)
+            raft_log_append_entry(&r->log, &entries[i]);
 
             // Persist via callback
             if (r->callbacks.log_append) {
@@ -400,5 +399,59 @@ int raft_barrier(raft_t *r) {
     raft_send_heartbeats(r);
 
     // caller polls commit_index non blocking
+    return RAFT_OK;
+}
+
+// ============================================================================
+// NOOP for Lazy ALR Read Synchronization
+// ============================================================================
+
+int raft_propose_noop(raft_t *r, uint64_t *sync_index) {
+    if (!r || !sync_index) {
+        return RAFT_ERR_INVALID_ARG;
+    }
+
+    if (r->shutdown) {
+        return RAFT_ERR_SHUTDOWN;
+    }
+
+    if (r->state != RAFT_STATE_LEADER) {
+        return RAFT_ERR_NOT_LEADER;
+    }
+
+    // Append NOOP to in memory log
+    int ret = raft_log_append_noop(&r->log, r->current_term);
+    if (ret != RAFT_OK) {
+        return ret;
+    }
+
+    uint64_t index = raft_log_last_index(&r->log);
+
+    // Persist via callback (NOOP has no data)
+    if (r->callbacks.log_append) {
+        ret = r->callbacks.log_append(r->callback_ctx, index,
+                                      r->current_term, NULL, 0);
+        if (ret != 0) {
+            // Rollback in-memory on persist failure
+            raft_log_truncate_after(&r->log, index - 1);
+            return RAFT_ERR_INVALID_ARG;
+        }
+    }
+
+    // Update own match_index
+    r->peers[r->my_id].match_index = index;
+    r->peers[r->my_id].next_index = index + 1;
+
+    // Single node cluster: commit immediately
+    if (r->num_nodes == 1) {
+        r->commit_index = index;
+    }
+
+    // Send AppendEntries to replicate NOOP
+    raft_send_heartbeats(r);
+
+    *sync_index = index;
+    printf("[Node %d] Proposed NOOP at index %lu for ALR sync\n", r->my_id, index);
+
     return RAFT_OK;
 }
