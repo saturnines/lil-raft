@@ -114,6 +114,8 @@ uint64_t raft_random_election_timeout(void);
 int raft_log_init(raft_log_t *log);
 void raft_log_free(raft_log_t *log);
 int raft_log_append(raft_log_t *log, uint64_t term, const void *data, size_t len);
+int raft_log_append_noop(raft_log_t *log, uint64_t term);
+int raft_log_append_entry(raft_log_t *log, const raft_entry_t *entry);
 int raft_log_append_batch(raft_log_t *log, const raft_entry_t *entries, size_t count);
 raft_entry_t* raft_log_get(raft_log_t *log, uint64_t index);
 int raft_log_truncate_after(raft_log_t *log, uint64_t index);
