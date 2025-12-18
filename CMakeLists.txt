@@ -13,12 +13,16 @@ add_library(raft STATIC
 target_include_directories(raft PUBLIC src)
 
 # Tests
-enable_testing()
+option(RAFT_BUILD_TESTS "Build raft tests" OFF)
 
-set(TESTS log core election replication clusters torture)
+if(RAFT_BUILD_TESTS)
+    enable_testing()
 
-foreach(test ${TESTS})
-    add_executable(test_${test} tests/test_${test}.c)
-    target_link_libraries(test_${test} raft)
-    add_test(NAME test_${test} COMMAND test_${test})
-endforeach()
+    set(TESTS log core election replication clusters torture)
+
+    foreach(test ${TESTS})
+        add_executable(test_${test} tests/test_${test}.c)
+        target_link_libraries(test_${test} raft)
+        add_test(NAME test_${test} COMMAND test_${test})
+    endforeach()
+endif()
