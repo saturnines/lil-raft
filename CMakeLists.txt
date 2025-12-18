@@ -12,7 +12,7 @@ add_library(raft STATIC
 )
 target_include_directories(raft PUBLIC src)
 
-# Tests
+# Test
 option(RAFT_BUILD_TESTS "Build raft tests" OFF)
 
 if(RAFT_BUILD_TESTS)
