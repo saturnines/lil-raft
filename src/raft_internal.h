@@ -88,6 +88,9 @@ struct raft {
     // Timing
     struct timespec last_tick;
 
+    // Prng (unsure how good)
+    unsigned int prng_state;
+
     // Flags
     int shutdown;            // Shutting down?
 };
@@ -105,7 +108,7 @@ void raft_become_leader(raft_t *r);
 // ============================================================================
 
 uint64_t raft_get_time_ms(void);
-uint64_t raft_random_election_timeout(void);
+uint64_t raft_random_election_timeout(raft_t *r);
 
 // ============================================================================
 // Log Operations (raft_log.c)

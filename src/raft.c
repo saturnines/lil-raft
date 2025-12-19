@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 #include <stdio.h>
+#include <unistd.h>
 
 // Election timeout range: 150-300ms
 #define ELECTION_TIMEOUT_MIN_MS  150
@@ -32,11 +33,19 @@ uint64_t raft_get_time_ms(void) {
 }
 
 /**
+ * Per-node PRNG
+ */
+static inline unsigned int raft_rand(raft_t *r) {
+    r->prng_state = r->prng_state * 1103515245 + 12345;
+    return (r->prng_state >> 16) & 0x7fff;
+}
+
+/**
  * Get random election timeout (150-300ms)
  */
-uint64_t raft_random_election_timeout(void) {
+uint64_t raft_random_election_timeout(raft_t *r) {
     int range = ELECTION_TIMEOUT_MAX_MS - ELECTION_TIMEOUT_MIN_MS;
-    return ELECTION_TIMEOUT_MIN_MS + (rand() % range);
+    return ELECTION_TIMEOUT_MIN_MS + (raft_rand(r) % range);
 }
 
 /**
@@ -60,7 +69,7 @@ void raft_become_follower(raft_t *r, uint64_t term) {
     r->voted_for = -1;
     r->leader_id = -1;
     r->last_heartbeat_ms = raft_get_time_ms();
-    r->election_timeout_ms = raft_random_election_timeout();
+    r->election_timeout_ms = raft_random_election_timeout(r);
 
     // Clear votes
     r->votes_received = 0;
@@ -83,7 +92,7 @@ void raft_become_candidate(raft_t *r) {
     r->voted_for = r->my_id;  // Vote for self
     r->leader_id = -1;
     r->last_heartbeat_ms = raft_get_time_ms();
-    r->election_timeout_ms = raft_random_election_timeout();
+    r->election_timeout_ms = raft_random_election_timeout(r);
 
     // Reset votes
     r->votes_received = 1;  // Vote for self
@@ -151,6 +160,9 @@ raft_t* raft_create(int my_id,
     r->callbacks = *callbacks;
     r->callback_ctx = callback_ctx;
 
+    // Initialize per-node PRNG
+    r->prng_state = (unsigned int)(time(NULL) ^ (my_id * 2654435761u) ^ getpid());
+
     // Initialize log
     if (raft_log_init(&r->log) != RAFT_OK) {
         free(r);
@@ -188,12 +200,9 @@ raft_t* raft_create(int my_id,
     r->leader_id = -1;
 
     // Timing
-    r->election_timeout_ms = raft_random_election_timeout();
+    r->election_timeout_ms = raft_random_election_timeout(r);
     r->last_heartbeat_ms = raft_get_time_ms();
     clock_gettime(CLOCK_MONOTONIC, &r->last_tick);
-
-    // Seed random for election timeouts
-    srand((unsigned int)time(NULL) + my_id);
 
     printf("[Node %d] Created (term=%lu, nodes=%d)\n", my_id, term, num_nodes);
 
@@ -224,7 +233,7 @@ int raft_shutdown(raft_t *r) {
 }
 
 // ============================================================================
-// Tick for progress,ections, heartbeats
+// Tick for progress, elections, heartbeats
 // ============================================================================
 
 void raft_tick(raft_t *r) {
