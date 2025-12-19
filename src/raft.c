@@ -133,7 +133,7 @@ void raft_become_leader(raft_t *r) {
         r->peers[i].ae_inflight = 0;
     }
 
-    // Send immediate heartbeat (implemented in raft_replication.c)
+    // Send immediate heartbeat ( in raft_replication.c)
     raft_send_heartbeats(r);
 }
 
