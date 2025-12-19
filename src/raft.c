@@ -259,7 +259,7 @@ void raft_tick(raft_t *r) {
         }
     }
 
-    // Apply committed entries (if any)
+    // Apply committed entries
     // TODO: Move to separate function
     while (r->last_applied < r->commit_index) {
         r->last_applied++;
