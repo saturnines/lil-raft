@@ -11,6 +11,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <unistd.h>
+#include "C:\Users\Kevin\Desktop\lygus\src\util\logging.h"
 
 // Election timeout range: 150-300ms
 #define ELECTION_TIMEOUT_MIN_MS  150
@@ -160,10 +161,21 @@ raft_t* raft_create(int my_id,
     r->callbacks = *callbacks;
     r->callback_ctx = callback_ctx;
 
-    // Initialize per-node PRNG
-    r->prng_state = (unsigned int)(time(NULL) ^ (my_id * 2654435761u) ^ getpid());
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    r->prng_state = (unsigned int)(
+        ts.tv_nsec ^                    // Nanosecond timestamp
+        (ts.tv_sec << 20) ^             // Second timestamp shifted
+        (my_id * 2654435761u) ^         // Node ID mixed
+        (my_id << 16) ^                 // Node ID shifted differently
+        getpid() ^                      // Process ID
+        (uintptr_t)r                    // Memory address of struct
+    );
 
-    // Initialize log
+    for (int i = 0; i < my_id + 5; i++) {
+        raft_rand(r);
+    }
+
     if (raft_log_init(&r->log) != RAFT_OK) {
         free(r);
         return NULL;
