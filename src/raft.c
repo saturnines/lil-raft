@@ -11,7 +11,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "C:\Users\Kevin\Desktop\lygus\src\util\logging.h"
+#include "../../../src/util/logging.h"
 
 // Election timeout range: 150-300ms
 #define ELECTION_TIMEOUT_MIN_MS  150
