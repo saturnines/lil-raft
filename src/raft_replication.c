@@ -310,7 +310,7 @@ int raft_propose(raft_t *r, const void *data, size_t len) {
     r->peers[r->my_id].next_index = index + 1;
 
 
-    // This is such a lazy fix but it will work for single node clusters.
+    // single node clusters, just commit since we are quorum
     if (r->num_nodes == 1) {
         r->commit_index = index;
     }
