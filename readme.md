@@ -1,18 +1,17 @@
 # lil-raft
 
-bare bones implementation of  raft. no deps. bring your own network/storage.
+bare bones implementation of raft. no deps. bring your own network/storage.
 
 ## features
 
 - leader election
 - log replication
-- linearizable reads (lazy-alr) ()
-
-## not included (out of scope)
-
 - snapshots
-- membership changes
 - prevote
+
+## TODO
+- membership changes
+- finish Lazy-ALR support for linearizable reads
 
 ## build
 
