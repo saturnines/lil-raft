@@ -28,11 +28,14 @@ uint64_t raft_get_time_ms(void) {
 /**
  * Per-node PRNG
  */
-static inline unsigned int raft_rand(raft_t *r) {
-    r->prng_state = r->prng_state * 1103515245 + 12345;
-    return (r->prng_state >> 16) & 0x7fff;
+static inline uint32_t raft_rand(raft_t *r) {
+    uint32_t x = r->prng_state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    r->prng_state = x;
+    return x;
 }
-
 /**
  * Get random election timeout from config range
  */

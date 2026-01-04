@@ -108,7 +108,7 @@ struct raft {
     struct timespec last_tick;
 
     // Prng
-    unsigned int prng_state;
+    uint32_t prng_state;
 
     // Flags
     int shutdown;
