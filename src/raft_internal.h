@@ -96,10 +96,14 @@ struct raft {
     // Leader state
     int leader_id;           // Current leader (-1 if unknown)
 
-    // Snapshot state
+    // Snapshot state (completed)
     uint64_t snapshot_last_index;   // Last index included in snapshot
     uint64_t snapshot_last_term;    // Term of that index
     int snapshot_in_progress;       // Currently creating a snapshot?
+
+    // Snapshot state (pending, for async snapshots)
+    uint64_t snapshot_pending_index;  // Index being snapshotted (async)
+    uint64_t snapshot_pending_term;   // Term being snapshotted (async)
 
     // Per-peer snapshot transfer progress (leader only)
     raft_snapshot_progress_t *snapshot_send;
@@ -107,7 +111,7 @@ struct raft {
     // Timing
     struct timespec last_tick;
 
-    // Prng
+    // PRNG (xorshift32)
     uint32_t prng_state;
 
     // Flags
@@ -186,5 +190,9 @@ int raft_maybe_snapshot(raft_t *r);
 int raft_snapshot_restore(raft_t *r);
 int raft_send_installsnapshot(raft_t *r, int peer_id);
 int raft_peer_needs_snapshot(const raft_t *r, int peer_id);
+
+// Async snapshot support
+void raft_snapshot_poll(raft_t *r);
+void raft_snapshot_finish(raft_t *r);
 
 #endif // RAFT_INTERNAL_H

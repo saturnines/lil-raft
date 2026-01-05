@@ -3,6 +3,7 @@
  *
  * Handles:
  * - Triggering snapshots when log gets large
+ * - Async snapshot support (fork-based)
  * - Truncating log after successful snapshot
  * - InstallSnapshot RPC for slow followers
  * - Recovery from snapshot on startup
@@ -12,6 +13,50 @@
 #include "raft_errors.h"
 #include <stdio.h>
 #include <string.h>
+
+// ============================================================================
+// Async Snapshot Support
+// ============================================================================
+
+/**
+ * Poll for async snapshot completion
+ *
+ * Called from raft_tick() when snapshot_in_progress is set.
+ * If snapshot_poll callback exists and returns done, finishes the snapshot.
+ */
+void raft_snapshot_poll(raft_t *r) {
+    if (!r || !r->snapshot_in_progress) return;
+    if (!r->callbacks.snapshot_poll) return;
+
+    int done = r->callbacks.snapshot_poll(r->callback_ctx);
+    if (done) {
+        raft_snapshot_finish(r);
+    }
+}
+
+/**
+ * Complete snapshot after async creation
+ *
+ * Updates snapshot metadata and truncates log.
+ * Called either immediately (sync) or after poll returns done (async).
+ */
+void raft_snapshot_finish(raft_t *r) {
+    if (!r || !r->snapshot_in_progress) return;
+
+    // Update snapshot metadata from pending
+    r->snapshot_last_index = r->snapshot_pending_index;
+    r->snapshot_last_term = r->snapshot_pending_term;
+
+    // Truncate log - remove entries covered by snapshot
+    raft_log_truncate_before(&r->log, r->snapshot_last_index);
+
+    r->snapshot_in_progress = 0;
+    r->snapshot_pending_index = 0;
+    r->snapshot_pending_term = 0;
+
+    printf("[Node %d] Snapshot complete at index %lu, term %lu\n",
+           r->my_id, r->snapshot_last_index, r->snapshot_last_term);
+}
 
 // ============================================================================
 // Snapshot Creation (Leader or Follower)
@@ -57,12 +102,20 @@ int raft_maybe_snapshot(raft_t *r) {
  *
  * Can be called manually or from raft_maybe_snapshot().
  * The application callback does the actual serialization.
+ *
+ * Supports both sync and async snapshots:
+ * - If snapshot_poll callback is NULL: sync, finish immediately
+ * - If snapshot_poll callback exists: async, poll in raft_tick()
  */
 int raft_snapshot_create(raft_t *r) {
     if (!r) return RAFT_ERR_INVALID_ARG;
 
     if (!r->callbacks.snapshot_create) {
         return RAFT_ERR_INVALID_ARG;
+    }
+
+    if (r->snapshot_in_progress) {
+        return RAFT_ERR_SNAPSHOT_IN_PROGRESS;
     }
 
     // Snapshot up to last_applied (guaranteed committed + applied)
@@ -77,36 +130,36 @@ int raft_snapshot_create(raft_t *r) {
     } else if (snap_index == r->snapshot_last_index) {
         snap_term = r->snapshot_last_term;
     } else {
-        // Entry not in log and not at snapshot boundary,  shouldn't happen
+        // Entry not in log and not at snapshot boundary, shouldn't happen
+        printf("[Node %d] Cannot snapshot: entry %lu not found\n",
+               r->my_id, snap_index);
         return RAFT_ERR_INVALID_ARG;
     }
 
-    // Debug
-    printf("[Node %d] Creating snapshot at index %lu, term %lu\n",
+    printf("[Node %d] Starting snapshot at index %lu, term %lu\n",
            r->my_id, snap_index, snap_term);
 
+    // Mark in progress and save pending metadata
     r->snapshot_in_progress = 1;
+    r->snapshot_pending_index = snap_index;
+    r->snapshot_pending_term = snap_term;
 
-    // Call application to save state
+    // Call application to start snapshot
     int ret = r->callbacks.snapshot_create(r->callback_ctx, snap_index, snap_term);
 
-    r->snapshot_in_progress = 0;
-
-    if (ret != 0) {
+    if (ret != RAFT_OK) {
+        r->snapshot_in_progress = 0;
+        r->snapshot_pending_index = 0;
+        r->snapshot_pending_term = 0;
         printf("[Node %d] Snapshot creation failed: %d\n", r->my_id, ret);
         return RAFT_ERR_SNAPSHOT_FAILED;
     }
 
-    // Update snapshot metadata
-    r->snapshot_last_index = snap_index;
-    r->snapshot_last_term = snap_term;
-
-    // Truncate log , remove entries covered by snapshot
-    raft_log_truncate_before(&r->log, snap_index);
-
-
-    // Debug
-    printf("[Node %d] Snapshot complete, log compacted\n", r->my_id);
+    // If no poll callback, assume synchronous - finish immediately
+    if (!r->callbacks.snapshot_poll) {
+        raft_snapshot_finish(r);
+    }
+    // Otherwise, async - raft_tick() will poll for completion
 
     return RAFT_OK;
 }
@@ -142,7 +195,6 @@ int raft_snapshot_restore(raft_t *r) {
         return ret;
     }
 
-    // Debug
     printf("[Node %d] Restored snapshot at index %lu, term %lu\n",
            r->my_id, snap_index, snap_term);
 
@@ -326,7 +378,6 @@ int raft_recv_installsnapshot(raft_t *r,
             r->last_applied = req->last_index;
         }
 
-        // Debug
         printf("[Node %d] Snapshot applied, index=%lu term=%lu\n",
                r->my_id, req->last_index, req->last_term);
     }
