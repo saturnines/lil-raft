@@ -300,7 +300,7 @@ typedef struct {
     int (*snapshot_create)(void *ctx, uint64_t index, uint64_t term);
 
     /**
-     * Poll for async snapshot completion (optional)
+     * Poll for async snapshot completion
      *
      * If snapshot_create() is async (e.g., fork-based, returns immediately),
      * this callback checks if the snapshot is done.
