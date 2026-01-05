@@ -26,7 +26,7 @@ uint64_t raft_get_time_ms(void) {
 }
 
 /**
- * Per-node PRNG
+ * Per-node PRNG (xorshift32)
  */
 static inline uint32_t raft_rand(raft_t *r) {
     uint32_t x = r->prng_state;
@@ -36,6 +36,7 @@ static inline uint32_t raft_rand(raft_t *r) {
     r->prng_state = x;
     return x;
 }
+
 /**
  * Get random election timeout from config range
  */
@@ -99,7 +100,6 @@ void raft_become_candidate(raft_t *r) {
         r->votes_for_me[r->my_id] = 1;
     }
 
-    // Debug
     printf("[Node %d] Became CANDIDATE for term %lu\n", r->my_id, r->current_term);
 
     // Persist term and vote
@@ -122,11 +122,9 @@ void raft_become_leader(raft_t *r) {
     r->leader_id = r->my_id;
     r->last_heartbeat_ms = raft_get_time_ms();
 
-
     r->prevote_in_progress = 0;
     r->prevotes_received = 0;
 
-    // Debug
     printf("[Node %d] Became LEADER for term %lu\n", r->my_id, r->current_term);
 
     // Initialize leader state
@@ -173,17 +171,19 @@ raft_t* raft_create(int my_id,
     r->callbacks = *callbacks;
     r->callback_ctx = callback_ctx;
 
+    // Seed PRNG with entropy
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    r->prng_state = (unsigned int)(
-        ts.tv_nsec ^                    // Nanosecond timestamp
-        (ts.tv_sec << 20) ^             // Second timestamp shifted
-        (my_id * 2654435761u) ^         // Node ID mixed
-        (my_id << 16) ^                 // Node ID shifted differently
+    r->prng_state = (uint32_t)(
+        ts.tv_nsec ^
+        (ts.tv_sec << 20) ^
+        (my_id * 2654435761u) ^
+        (my_id << 16) ^
         getpid() ^
-        (uintptr_t)r                    // Memory address of struct
+        (uintptr_t)r
     );
 
+    // Warm up PRNG
     for (int i = 0; i < my_id + 5; i++) {
         raft_rand(r);
     }
@@ -213,6 +213,8 @@ raft_t* raft_create(int my_id,
     r->snapshot_last_index = 0;
     r->snapshot_last_term = 0;
     r->snapshot_in_progress = 0;
+    r->snapshot_pending_index = 0;
+    r->snapshot_pending_term = 0;
 
     // Load persistent state
     uint64_t term = 0;
@@ -292,6 +294,11 @@ const raft_config_t* raft_get_config(const raft_t *r) {
 
 void raft_tick(raft_t *r) {
     if (!r || r->shutdown) return;
+
+    // Poll for async snapshot completion
+    if (r->snapshot_in_progress) {
+        raft_snapshot_poll(r);
+    }
 
     uint64_t now = raft_get_time_ms();
     uint64_t elapsed = now - r->last_heartbeat_ms;
