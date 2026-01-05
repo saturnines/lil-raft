@@ -289,14 +289,27 @@ typedef struct {
      * Application should serialize its state to stable storage,
      * tagged with the given index and term.
      *
-     * Can be async (e.g., fork-based) - just block until complete.
-     * Raft will truncate the log after this returns successfully.
+     * Can be async (e.g., fork-based) - if async, return immediately
+     * and implement snapshot_poll() to signal completion.
+     * Raft will truncate the log after snapshot completes.
      *
      * @param index Raft index this snapshot covers (all entries up to here)
      * @param term  Term of the entry at index
-     * @return 0 on success, non-zero on error
+     * @return 0 on success (or async started), non-zero on error
      */
     int (*snapshot_create)(void *ctx, uint64_t index, uint64_t term);
+
+    /**
+     * Poll for async snapshot completion (optional)
+     *
+     * If snapshot_create() is async (e.g., fork-based, returns immediately),
+     * this callback checks if the snapshot is done.
+     *
+     * If NULL, snapshot_create() is assumed to be synchronous.
+     *
+     * @return 1 if snapshot complete (success or failure), 0 if still in progress
+     */
+    int (*snapshot_poll)(void *ctx);
 
     /**
      * Load latest snapshot on startup
