@@ -309,7 +309,7 @@ void raft_tick(raft_t *r) {
     // Follower or Candidate: Check election timeout
     if (r->state == RAFT_STATE_FOLLOWER || r->state == RAFT_STATE_CANDIDATE) {
         if (elapsed >= r->election_timeout_ms) {
-            // Election timeout expired
+            r->leader_id = -1; // This fixes a livelock bug, there is probably a better way to do this,
             if (r->config.flags & RAFT_FLAG_PREVOTE_ENABLED) {
                 raft_start_prevote(r);
             } else {
