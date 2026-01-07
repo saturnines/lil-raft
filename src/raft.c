@@ -141,6 +141,9 @@ void raft_become_leader(raft_t *r) {
 
     // Send immediate heartbeat (in raft_replication.c)
     raft_send_heartbeats(r);
+
+    uint64_t noop_idx;
+    raft_propose_noop(r, &noop_idx);
 }
 
 // ============================================================================
@@ -395,14 +398,13 @@ void raft_get_indexes(const raft_t *r,
 }
 
 uint64_t raft_get_pending_index(const raft_t *r) {
-    if (!r || r->state != RAFT_STATE_LEADER) {
-        return 0;
-    }
+    if (!r) return 0;
 
     uint64_t last_idx = raft_log_last_index(&r->log);
     uint64_t last_term = raft_log_last_term(&r->log);
 
-    if (last_idx > r->last_applied && last_term == r->current_term) {
+    // Must be uncommitted AND from current term
+    if (last_idx > r->commit_index && last_term == r->current_term) {
         return last_idx;
     }
 
