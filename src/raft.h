@@ -343,6 +343,13 @@ int raft_get_leader_id(const raft_t *r);
  */
 int raft_get_node_id(const raft_t *r);
 
+/**
+ * Get term of log entry at given index
+ * @return Term at index, or 0 if index not in log (compacted/truncated/invalid)
+ */
+uint64_t raft_log_term_at(const raft_t *r, uint64_t index);
+
+
 #ifdef __cplusplus
 }
 #endif
