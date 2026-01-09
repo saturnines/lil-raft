@@ -129,6 +129,21 @@ typedef struct {
 } raft_installsnapshot_resp_t;
 
 // ============================================================================
+// ReadIndex RPC (for linearizable reads - ALR support)
+// ============================================================================
+
+typedef struct {
+    uint64_t req_id;     // Unique request ID (for correlating response)
+    int      from_node;  // Requesting node ID
+} raft_readindex_req_t;
+
+typedef struct {
+    uint64_t req_id;      // Echoed from request
+    uint64_t read_index;  // Commit index safe for linearizable reads (0 if queued/error)
+    int      err;         // 0 on success, RAFT_ERR_* on failure
+} raft_readindex_resp_t;
+
+// ============================================================================
 // Log Entry
 // ============================================================================
 
@@ -375,6 +390,46 @@ typedef struct {
      */
     int (*send_installsnapshot)(void *ctx, int peer_id,
                                 const raft_installsnapshot_req_t *req);
+
+    // --- ReadIndex (for linearizable reads) ---
+
+    /**
+     * Send ReadIndex request to leader (follower -> leader)
+     *
+     * @param peer_id  Leader's node ID
+     * @param req      Request data
+     * @return 0 if sent, non-zero on error
+     */
+    int (*send_readindex)(void *ctx, int peer_id,
+                          const raft_readindex_req_t *req);
+
+    /**
+     * Send ReadIndex response to follower (leader -> follower)
+     *
+     * @param peer_id  Follower's node ID
+     * @param req_id   Request ID being responded to
+     * @param index    Read index (0 if error)
+     * @param err      0 on success, RAFT_ERR_* on failure
+     * @return 0 if sent, non-zero on error
+     */
+    int (*send_readindex_resp)(void *ctx, int peer_id,
+                                uint64_t req_id, uint64_t index, int err);
+
+    /**
+     * ReadIndex completion callback (for local ALR layer)
+     *
+     * Called when a ReadIndex request completes, either:
+     * - On leader: after heartbeat quorum confirms leadership
+     * - On follower: when response received from leader
+     *
+     * The ALR layer should call alr_on_read_index() from this callback.
+     *
+     * @param req_id  Request ID
+     * @param index   Read index (0 if error)
+     * @param err     0 on success, error code on failure
+     */
+    void (*on_readindex_complete)(void *ctx, uint64_t req_id,
+                                   uint64_t index, int err);
 
 } raft_callbacks_t;
 

@@ -236,6 +236,9 @@ int raft_recv_appendentries_response(raft_t *r,
             r->snapshot_send[peer_id].offset = 0;
         }
 
+        // Record ack for pending ReadIndex requests
+        raft_readindex_record_ack(r, peer_id);
+
         // Try to advance commit_index
         // Find the highest N such that a majority of matchIndex[i] >= N
         // and log[N].term == currentTerm

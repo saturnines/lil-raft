@@ -58,6 +58,21 @@ typedef struct {
 } raft_snapshot_progress_t;
 
 // ============================================================================
+// Pending ReadIndex request (leader side)
+// ============================================================================
+
+#define RAFT_MAX_PENDING_READ_INDEX 64
+
+typedef struct {
+    uint64_t req_id;         // Request ID for correlation
+    int      from_node;      // Requesting node (-1 = local leader request)
+    uint64_t commit_index;   // Commit index when request arrived
+    uint64_t term;           // Term when request arrived
+    uint64_t ack_mask;       // Bitmask of nodes that acked (prevents double-counting)
+    int      active;         // Slot in use?
+} raft_pending_read_t;
+
+// ============================================================================
 // Main Raft Structure
 // ============================================================================
 
@@ -107,6 +122,10 @@ struct raft {
 
     // Per-peer snapshot transfer progress (leader only)
     raft_snapshot_progress_t *snapshot_send;
+
+    // ReadIndex state (leader only)
+    raft_pending_read_t *pending_reads;  // Array of pending ReadIndex requests
+    int pending_reads_count;              // Number of active requests
 
     // Timing
     struct timespec last_tick;
@@ -194,5 +213,70 @@ int raft_peer_needs_snapshot(const raft_t *r, int peer_id);
 // Async snapshot support
 void raft_snapshot_poll(raft_t *r);
 void raft_snapshot_finish(raft_t *r);
+
+// ============================================================================
+// ReadIndex (raft_readindex.c)
+// ============================================================================
+
+/**
+ * Initialize ReadIndex state
+ * Called from raft_create()
+ */
+int raft_readindex_init(raft_t *r);
+
+/**
+ * Free ReadIndex state
+ * Called from raft_destroy()
+ */
+void raft_readindex_free(raft_t *r);
+
+/**
+ * Request read index (async)
+ *
+ * For leader: queues request, completes after heartbeat quorum
+ * For follower: sends ReadIndex RPC to leader
+ *
+ * @param req_id  Caller-provided request ID for correlation
+ * @return RAFT_OK if request sent/queued
+ *         RAFT_ERR_NOT_LEADER if follower with no known leader
+ */
+int raft_request_read_index_async(raft_t *r, uint64_t req_id);
+
+/**
+ * Handle incoming ReadIndex request (leader only)
+ */
+int raft_recv_readindex(raft_t *r,
+                        const raft_readindex_req_t *req,
+                        raft_readindex_resp_t *resp);
+
+/**
+ * Handle ReadIndex response (follower only)
+ */
+int raft_recv_readindex_response(raft_t *r,
+                                  const raft_readindex_resp_t *resp);
+
+/**
+ * Record heartbeat ack for ReadIndex quorum tracking
+ * Call this from raft_recv_appendentries_response() on success
+ */
+void raft_readindex_record_ack(raft_t *r, int peer_id);
+
+/**
+ * Check and complete pending ReadIndex requests
+ * Called automatically by raft_readindex_record_ack()
+ */
+void raft_readindex_check_quorum(raft_t *r);
+
+/**
+ * Clear pending ReadIndex requests (on term change or step down)
+ * Call this from raft_become_follower()
+ */
+void raft_readindex_clear_pending(raft_t *r);
+
+/**
+ * Get term at log index
+ * Returns 0 if index doesn't exist (compacted or beyond log)
+ */
+uint64_t raft_log_term_at(const raft_t *r, uint64_t index);
 
 #endif // RAFT_INTERNAL_H
