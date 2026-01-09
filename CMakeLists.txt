@@ -10,6 +10,7 @@ add_library(raft STATIC
         src/raft_election.c
         src/raft_replication.c
         src/raft_snapshot.c
+        src/raft_readindex.c
 )
 target_include_directories(raft PUBLIC src)
 
