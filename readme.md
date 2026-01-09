@@ -11,8 +11,7 @@ bare bones implementation of raft. no deps. bring your own network/storage.
 
 ## TODO
 - membership changes
-- finish Lazy-ALR support for linearizable reads
-
+- 
 ## build
 
 ```
