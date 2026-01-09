@@ -375,15 +375,6 @@ int raft_get_node_id(const raft_t *r) {
     return r ? r->my_id : -1;
 }
 
-uint64_t raft_log_term_at(const raft_t *r, uint64_t index) {
-    if (!r) return 0;
-
-    raft_entry_t *entry = raft_log_get((raft_log_t *)&r->log, index);
-    if (!entry) {
-        return 0;
-    }
-    return entry->term;
-}
 // ============================================================================
 // ALR's Read Operations
 // ============================================================================
