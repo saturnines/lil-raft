@@ -407,11 +407,12 @@ void raft_get_indexes(const raft_t *r,
 }
 
 uint64_t raft_get_pending_index(const raft_t *r) {
-    if (!r || !raft_is_leader(r)) return 0;
+    if (!r) return 0;
 
     uint64_t last_idx = raft_log_last_index(&r->log);
     uint64_t last_term = raft_log_last_term(&r->log);
 
+    // EXPERIMENTAL UNSURE IF WORKS
     if (last_idx > r->commit_index && last_term == r->current_term) {
         return last_idx;
     }
