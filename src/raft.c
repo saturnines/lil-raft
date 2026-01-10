@@ -309,7 +309,7 @@ void raft_tick(raft_t *r) {
     // Follower or Candidate: Check election timeout
     if (r->state == RAFT_STATE_FOLLOWER || r->state == RAFT_STATE_CANDIDATE) {
         if (elapsed >= r->election_timeout_ms) {
-            r->leader_id = -1; // This fixes a livelock bug, there is probably a better way to do this,
+            r->leader_id = -1;
             if (r->config.flags & RAFT_FLAG_PREVOTE_ENABLED) {
                 raft_start_prevote(r);
             } else {
@@ -328,10 +328,14 @@ void raft_tick(raft_t *r) {
 
     // Apply committed entries
     while (r->last_applied < r->commit_index) {
+        raft_entry_t *entry = raft_log_get(&r->log, r->last_applied + 1);
+        if (!entry) {
+            break; // allow snap to popup
+        }
+
         r->last_applied++;
 
-        raft_entry_t *entry = raft_log_get(&r->log, r->last_applied);
-        if (entry && r->callbacks.apply_entry) {
+        if (r->callbacks.apply_entry) {
             r->callbacks.apply_entry(r->callback_ctx,
                                     entry->index,
                                     entry->term,
@@ -346,7 +350,6 @@ void raft_tick(raft_t *r) {
         raft_maybe_snapshot(r);
     }
 }
-
 // ============================================================================
 // State Queries
 // ============================================================================
