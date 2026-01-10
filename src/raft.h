@@ -140,6 +140,16 @@ uint64_t raft_get_last_applied(const raft_t *r);
 int raft_get_leader_id(const raft_t *r);
 int raft_get_node_id(const raft_t *r);
 
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Get current monotonic time in milliseconds
+ * @return Time in milliseconds since unspecified epoch (monotonic clock)
+ */
+uint64_t raft_get_time_ms(void);
+
 #ifdef __cplusplus
 }
 #endif
