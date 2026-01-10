@@ -117,13 +117,13 @@ void raft_readindex_check_quorum(raft_t *r) {
                 r->callbacks.send_readindex_resp(r->callback_ctx,
                                                   p->from_node,
                                                   p->req_id,
-                                                  p->commit_index,
+                                                  r->commit_index,
                                                   0);
             } else if (p->from_node == -1 && r->callbacks.on_readindex_complete) {
                 // Local leader request, callback
                 r->callbacks.on_readindex_complete(r->callback_ctx,
                                                     p->req_id,
-                                                    p->commit_index,
+                                                    r->commit_index,
                                                     0);
             }
             p->active = 0;
