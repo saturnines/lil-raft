@@ -457,6 +457,13 @@ int raft_peer_needs_snapshot(const raft_t *r, int peer_id) {
         return 0;
     }
 
-    // Peer needs snapshot if their next_index is at or before our snapshot
-    return r->peers[peer_id].next_index <= r->snapshot_last_index;
+    uint64_t next_idx = r->peers[peer_id].next_index;
+    uint64_t first_in_log = r->log.base_index + 1;
+
+
+    if (next_idx < first_in_log) {
+        return 1;
+    }
+
+    return 0;
 }
