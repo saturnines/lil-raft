@@ -47,6 +47,9 @@ static raft_pending_read_t* queue_read_index(raft_t *r, uint64_t req_id,
             p->commit_index = r->commit_index;
             p->term = r->current_term;
             p->ack_mask = (1ULL << r->my_id);
+            // Only accept ACKs from heartbeats sent AFTER this read was queued
+            // This prevents stale reads during partitions
+            p->required_seq = r->heartbeat_seq + 1;
 
             p->active = 1;
             r->pending_reads_count++;
@@ -133,10 +136,10 @@ void raft_readindex_check_quorum(raft_t *r) {
 }
 
 // ============================================================================
-// Leader:
+// Leader: Record heartbeat ACK for ReadIndex quorum tracking
 // ============================================================================
 
-void raft_readindex_record_ack(raft_t *r, int peer_id) {
+void raft_readindex_record_ack(raft_t *r, int peer_id, uint64_t seq) {
     if (!r || r->state != RAFT_STATE_LEADER) return;
     if (!r->pending_reads) return;
     if (peer_id < 0 || peer_id >= 64) return;  // Bitmask limit
@@ -146,7 +149,7 @@ void raft_readindex_record_ack(raft_t *r, int peer_id) {
     // Set bit for this peer on all pending reads from current term
     for (int i = 0; i < RAFT_MAX_PENDING_READ_INDEX; i++) {
         raft_pending_read_t *p = &r->pending_reads[i];
-        if (p->active && p->term == r->current_term) {
+        if (p->active && p->term == r->current_term && seq >= p->required_seq) {
             p->ack_mask |= peer_bit;
         }
     }

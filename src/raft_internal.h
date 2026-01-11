@@ -69,6 +69,7 @@ typedef struct {
     uint64_t commit_index;   // Commit index when request arrived
     uint64_t term;           // Term when request arrived
     uint64_t ack_mask;       // Bitmask of nodes that acked (prevents double-counting)
+    uint64_t required_seq;
     int      active;         // Slot in use?
 } raft_pending_read_t;
 
@@ -126,6 +127,7 @@ struct raft {
     // ReadIndex state (leader only)
     raft_pending_read_t *pending_reads;  // Array of pending ReadIndex requests
     int pending_reads_count;              // Number of active requests
+    uint64_t heartbeat_seq;               // Monotonic Counter
 
     // Timing
     struct timespec last_tick;
@@ -258,8 +260,11 @@ int raft_recv_readindex_response(raft_t *r,
 /**
  * Record heartbeat ack for ReadIndex quorum tracking
  * Call this from raft_recv_appendentries_response() on success
+ *
+ * @param peer_id  The peer that sent the ACK
+ * @param seq      The sequence number from the ACK (prevents stale reads)
  */
-void raft_readindex_record_ack(raft_t *r, int peer_id);
+void raft_readindex_record_ack(raft_t *r, int peer_id, uint64_t seq);
 
 /**
  * Check and complete pending ReadIndex requests

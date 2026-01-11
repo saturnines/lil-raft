@@ -17,6 +17,10 @@
 void raft_send_heartbeats(raft_t *r) {
     if (!r || r->state != RAFT_STATE_LEADER) return;
 
+    // Increment the heartbeat sequence number for this round
+    // This is used by ReadIndex to reject stale ACKs from partitioned nodes
+    r->heartbeat_seq++;
+
     // Use config limit, fall back to compile-time max
     size_t max_entries = r->config.max_entries_per_msg;
     if (max_entries == 0 || max_entries > REPLICATION_BATCH_MAX) {
@@ -56,6 +60,7 @@ void raft_send_heartbeats(raft_t *r) {
             .prev_log_index = prev_idx,
             .prev_log_term = prev_term,
             .leader_commit = r->commit_index,
+            .seq = r->heartbeat_seq,
         };
 
         // Copy entries to stack buffer (deep copy)
@@ -92,6 +97,7 @@ int raft_recv_appendentries(raft_t *r,
     resp->term = r->current_term;
     resp->success = 0;
     resp->match_index = 0;
+    resp->seq = req->seq; // DEBUG, added so followers can read from leader.
 
     // Rule 1: Reply false if term < currentTerm
     if (req->term < r->current_term) {
@@ -237,7 +243,8 @@ int raft_recv_appendentries_response(raft_t *r,
         }
 
         // Record ack for pending ReadIndex requests
-        raft_readindex_record_ack(r, peer_id);
+        // Pass the sequence number to prevent stale reads during partitions
+        raft_readindex_record_ack(r, peer_id, resp->seq);
 
         // Try to advance commit_index
         // Find the highest N such that a majority of matchIndex[i] >= N

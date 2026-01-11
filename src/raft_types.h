@@ -96,12 +96,14 @@ typedef struct {
     uint64_t prev_log_index; // Index of log entry immediately preceding new ones
     uint64_t prev_log_term;  // Term of prev_log_index entry
     uint64_t leader_commit;  // Leader's commit_index
+    uint64_t seq;            // Heartbeat Sequence ID
 } raft_appendentries_req_t;
 
 typedef struct {
     uint64_t term;        // Current term, for leader to update itself
     int success;          // 1 if follower contained entry matching prev_log_index/term
     uint64_t match_index; // Highest index known to be replicated (for fast rollback)
+    uint64_t seq ;         // Echo back to Leader
 } raft_appendentries_resp_t;
 
 // ============================================================================
