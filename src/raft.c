@@ -219,6 +219,17 @@ raft_t* raft_create(int my_id,
     r->snapshot_pending_index = 0;
     r->snapshot_pending_term = 0;
 
+    // Initialize ReadIndex state
+    if (raft_readindex_init(r) != RAFT_OK) {
+        raft_log_free(&r->log);
+        free(r->peers);
+        free(r->votes_for_me);
+        free(r->prevotes_for_me);
+        free(r->snapshot_send);
+        free(r);
+        return NULL;
+    }
+
     // Load persistent state
     uint64_t term = 0;
     int voted_for = -1;
