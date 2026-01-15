@@ -466,3 +466,33 @@ size_t raft_log_copy_range(raft_log_t *log, uint64_t start_idx,
 
     return count;
 }
+
+// ============================================================================
+// Term Search
+// ============================================================================
+
+uint64_t raft_log_find_first_of_term(raft_log_t *log, uint64_t term) {
+    if (!log || log->count == 0) return 0;
+
+    uint64_t first = raft_log_first_index(log);
+    uint64_t last = raft_log_last_index(log);
+
+    for (uint64_t i = first; i <= last; i++) {
+        raft_entry_t *e = raft_log_get(log, i);
+        if (e && e->term == term) return i;
+    }
+    return 0;
+}
+
+uint64_t raft_log_find_last_of_term(raft_log_t *log, uint64_t term) {
+    if (!log || log->count == 0) return 0;
+
+    uint64_t first = raft_log_first_index(log);
+    uint64_t last = raft_log_last_index(log);
+
+    for (uint64_t i = last; i >= first && i > 0; i--) {
+        raft_entry_t *e = raft_log_get(log, i);
+        if (e && e->term == term) return i;
+    }
+    return 0;
+}

@@ -102,6 +102,8 @@ typedef struct {
 typedef struct {
     uint64_t term;        // Current term, for leader to update itself
     int success;          // 1 if follower contained entry matching prev_log_index/term
+    uint64_t conflict_term; // term of conflict entry
+    uint64_t conflict_index;  // First idx of conflict term
     uint64_t match_index; // Highest index known to be replicated (for fast rollback)
     uint64_t seq ;         // Echo back to Leader
 } raft_appendentries_resp_t;

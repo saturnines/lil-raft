@@ -147,7 +147,11 @@ int raft_recv_appendentries(raft_t *r,
             if (prev_entry->term != req->prev_log_term) {
                 printf("[Node %d] Rejecting AE: term mismatch at %lu (got %lu, want %lu)\n",
                        r->my_id, req->prev_log_index, prev_entry->term, req->prev_log_term);
-                // Truncate conflicting entries
+
+                // Set conflict info for fast rollback
+                resp->conflict_term = prev_entry->term;
+                resp->conflict_index = raft_log_find_first_of_term(&r->log, prev_entry->term);
+
                 raft_log_truncate_after(&r->log, req->prev_log_index - 1);
                 resp->match_index = req->prev_log_index - 1;
                 return RAFT_OK;
@@ -271,9 +275,18 @@ int raft_recv_appendentries_response(raft_t *r,
             }
         }
     } else {
-        // AppendEntries failed decrement next_index and retry
-        // Use match_index hint for faster rollback
-        if (resp->match_index > 0 && resp->match_index < r->peers[peer_id].next_index) {
+        // AppendEntries failed - use conflict info for fast rollback (§5.3)
+        if (resp->conflict_term > 0) {
+            // Find our last entry with the conflicting term
+            uint64_t leader_last = raft_log_find_last_of_term(&r->log, resp->conflict_term);
+            if (leader_last > 0) {
+                // We have this term - skip to end of it
+                r->peers[peer_id].next_index = leader_last + 1;
+            } else {
+                // We don't have this term - jump to follower's first index of it
+                r->peers[peer_id].next_index = resp->conflict_index;
+            }
+        } else if (resp->match_index > 0 && resp->match_index < r->peers[peer_id].next_index) {
             r->peers[peer_id].next_index = resp->match_index + 1;
         } else if (r->peers[peer_id].next_index > 1) {
             r->peers[peer_id].next_index--;

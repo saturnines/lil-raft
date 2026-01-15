@@ -284,4 +284,7 @@ void raft_readindex_clear_pending(raft_t *r);
  */
 uint64_t raft_log_term_at(const raft_t *r, uint64_t index);
 
+
+uint64_t raft_log_find_first_of_term(raft_log_t *log, uint64_t term);
+uint64_t raft_log_find_last_of_term(raft_log_t *log, uint64_t term);
 #endif // RAFT_INTERNAL_H
