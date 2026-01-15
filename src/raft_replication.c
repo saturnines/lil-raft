@@ -387,16 +387,14 @@ int raft_propose_batch(raft_t *r,
         }
     }
 
-    // Update own match_index
-    r->peers[r->my_id].match_index = last_index;
-    r->peers[r->my_id].next_index = last_index + 1;
-
+    // Fsync once for entire batch
     if (r->callbacks.log_fsync) {
         r->callbacks.log_fsync(r->callback_ctx);
     }
 
     // Update own match_index
     r->peers[r->my_id].match_index = last_index;
+    r->peers[r->my_id].next_index = last_index + 1;
 
     // Replicate
     raft_send_heartbeats(r);
