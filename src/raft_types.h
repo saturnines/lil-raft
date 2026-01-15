@@ -244,6 +244,9 @@ typedef struct {
      */
     uint64_t (*log_last_term)(void *ctx);
 
+
+    int (*log_fsync)(void *ctx);  // Fsync after batch
+
     // --- State Machine Application ---
 
     /**

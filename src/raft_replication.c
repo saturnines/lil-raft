@@ -183,6 +183,10 @@ int raft_recv_appendentries(raft_t *r,
         }
     }
 
+    if (n_entries > 0 && r->callbacks.log_fsync) {
+        r->callbacks.log_fsync(r->callback_ctx);
+    }
+
     // Rule 5: If leaderCommit > commitIndex, set commitIndex =
     // min(leaderCommit, index of last new entry)
     if (req->leader_commit > r->commit_index) {
@@ -315,6 +319,11 @@ int raft_propose(raft_t *r, const void *data, size_t len) {
         }
     }
 
+    // Fsync helper
+    if (r->callbacks.log_fsync) {
+        r->callbacks.log_fsync(r->callback_ctx);
+    }
+
     // Update own match_index
     r->peers[r->my_id].match_index = index;
     r->peers[r->my_id].next_index = index + 1;
@@ -382,6 +391,13 @@ int raft_propose_batch(raft_t *r,
     r->peers[r->my_id].match_index = last_index;
     r->peers[r->my_id].next_index = last_index + 1;
 
+    if (r->callbacks.log_fsync) {
+        r->callbacks.log_fsync(r->callback_ctx);
+    }
+
+    // Update own match_index
+    r->peers[r->my_id].match_index = last_index;
+
     // Replicate
     raft_send_heartbeats(r);
 
@@ -422,6 +438,11 @@ int raft_propose_noop(raft_t *r, uint64_t *sync_index) {
             raft_log_truncate_after(&r->log, index - 1);
             return RAFT_ERR_INVALID_ARG;
         }
+    }
+
+    // Fsync
+    if (r->callbacks.log_fsync) {
+        r->callbacks.log_fsync(r->callback_ctx);
     }
 
     // Update own match_index
