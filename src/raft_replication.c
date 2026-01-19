@@ -98,6 +98,8 @@ int raft_recv_appendentries(raft_t *r,
     resp->success = 0;
     resp->match_index = 0;
     resp->seq = req->seq; // DEBUG, added so followers can read from leader.
+    resp->conflict_term = 0;
+    resp->conflict_index = 0;
 
     // Rule 1: Reply false if term < currentTerm
     if (req->term < r->current_term) {
