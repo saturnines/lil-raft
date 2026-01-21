@@ -30,11 +30,30 @@ void raft_send_heartbeats(raft_t *r) {
     for (int i = 0; i < r->num_nodes; i++) {
         if (i == r->my_id) continue;
 
-        // Check if peer needs snapshot instead of AppendEntries
         if (raft_peer_needs_snapshot(r, i)) {
-            // Peer is too far behind - send InstallSnapshot instead
+            if (r->snapshot_send[i].in_progress) {
+                uint64_t now = raft_get_time_ms();
+                if (now - r->snapshot_send[i].last_sent_ms > 5000) {
+                    r->snapshot_send[i].in_progress = 0;
+                    r->snapshot_send[i].offset = 0;
+                }
+            }
+
             if (!r->snapshot_send[i].in_progress) {
                 raft_send_installsnapshot(r, i);
+            }
+
+            raft_appendentries_req_t req = {
+                .term = r->current_term,
+                .leader_id = r->my_id,
+                .prev_log_index = r->snapshot_last_index,
+                .prev_log_term = r->snapshot_last_term,
+                .leader_commit = r->commit_index,
+                .seq = r->heartbeat_seq,
+            };
+
+            if (r->callbacks.send_appendentries) {
+                r->callbacks.send_appendentries(r->callback_ctx, i, &req, NULL, 0);
             }
             continue;
         }

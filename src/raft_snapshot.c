@@ -460,9 +460,6 @@ int raft_peer_needs_snapshot(const raft_t *r, int peer_id) {
     uint64_t next_idx = r->peers[peer_id].next_index;
     uint64_t first_in_log = r->log.base_index + 1;
 
-    printf("[Node %d] peer_needs_snapshot(%d): next_idx=%lu, first_in_log=%lu, needs=%d\n",
-           r->my_id, peer_id, next_idx, first_in_log, next_idx < first_in_log);
-
 
 
     if (next_idx < first_in_log) {
