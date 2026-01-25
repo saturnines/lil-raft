@@ -139,6 +139,7 @@ uint64_t raft_get_commit_index(const raft_t *r);
 uint64_t raft_get_last_applied(const raft_t *r);
 int raft_get_leader_id(const raft_t *r);
 int raft_get_node_id(const raft_t *r);
+uint64_t raft_get_last_log_index(const raft_t *r);
 
 // ============================================================================
 // Helpers

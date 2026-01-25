@@ -425,3 +425,8 @@ uint64_t raft_get_pending_index(const raft_t *r) {
 
     return 0;
 }
+
+uint64_t raft_get_last_log_index(const raft_t *r) {
+    if (!r) return 0;
+    return raft_log_last_index(&r->log);
+}
