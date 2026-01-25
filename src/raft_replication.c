@@ -314,13 +314,12 @@ int raft_propose(raft_t *r, const void *data, size_t len, uint64_t *out_index) {
         return RAFT_ERR_NOT_LEADER;
     }
 
-    // Append to in mem log
-    int ret = raft_log_append(&r->log, r->current_term, data, len);
+    // Append to in mem log - get index directly
+    uint64_t index;
+    int ret = raft_log_append(&r->log, r->current_term, data, len, &index);
     if (ret != RAFT_OK) {
         return ret;
     }
-
-    uint64_t index = raft_log_last_index(&r->log);
 
     // Persist via callback
     if (r->callbacks.log_append) {
@@ -374,16 +373,21 @@ int raft_propose_batch(raft_t *r,
         return RAFT_ERR_NOT_LEADER;
     }
 
-    // Append all entries
+    // Append all entries - track first and last index
+    uint64_t first_index = 0;
+    uint64_t last_index = 0;
+
     for (size_t i = 0; i < count; i++) {
-        int ret = raft_log_append(&r->log, r->current_term, entries[i], lengths[i]);
+        uint64_t index;
+        int ret = raft_log_append(&r->log, r->current_term, entries[i], lengths[i], &index);
         if (ret != RAFT_OK) {
             return ret;
         }
+        if (i == 0) {
+            first_index = index;
+        }
+        last_index = index;
     }
-
-    uint64_t last_index = raft_log_last_index(&r->log);
-    uint64_t first_index = last_index - count + 1;
 
     // Persist all entries
     if (r->callbacks.log_append_batch) {
@@ -437,13 +441,12 @@ int raft_propose_noop(raft_t *r, uint64_t *sync_index) {
         return RAFT_ERR_NOT_LEADER;
     }
 
-    // Append NOOP to in memory log
-    int ret = raft_log_append_noop(&r->log, r->current_term);
+    // Append NOOP to in memory log - get index directly
+    uint64_t index;
+    int ret = raft_log_append_noop(&r->log, r->current_term, &index);
     if (ret != RAFT_OK) {
         return ret;
     }
-
-    uint64_t index = raft_log_last_index(&r->log);
 
     // Persist via callback (NOOP has no data)
     if (r->callbacks.log_append) {
