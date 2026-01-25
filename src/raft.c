@@ -337,8 +337,8 @@ void raft_tick(raft_t *r) {
         }
     }
 
-    // Apply committed entries
-    while (r->last_applied < r->commit_index) {
+    // Apply committed entries // old while (r->last_applied < r->commit_index) {
+    while (r->last_applied < raft_log_last_index(&r->log)) {
         raft_entry_t *entry = raft_log_get(&r->log, r->last_applied + 1);
         if (!entry) {
             break; // allow snap to popup
