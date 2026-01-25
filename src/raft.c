@@ -415,10 +415,11 @@ uint64_t raft_get_pending_index(const raft_t *r) {
     if (!r) return 0;
 
     uint64_t last_idx = raft_log_last_index(&r->log);
-    uint64_t last_term = raft_log_last_term(&r->log);
 
-    // EXPERIMENTAL UNSURE IF WORKS
-    if (last_idx > r->commit_index && last_term == r->current_term) {
+    printf("[RAFT] get_pending_index: last_idx=%lu last_applied=%lu returning=%lu\n",
+           last_idx, r->last_applied, (last_idx > r->last_applied) ? last_idx : 0);
+
+    if (last_idx > r->last_applied) {
         return last_idx;
     }
 
