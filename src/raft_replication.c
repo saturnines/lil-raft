@@ -301,7 +301,7 @@ int raft_recv_appendentries_response(raft_t *r,
 // Propose (Client Write)
 // ============================================================================
 
-int raft_propose(raft_t *r, const void *data, size_t len) {
+int raft_propose(raft_t *r, const void *data, size_t len, uint64_t *out_index) {
     if (!r) {
         return RAFT_ERR_INVALID_ARG;
     }
@@ -342,7 +342,6 @@ int raft_propose(raft_t *r, const void *data, size_t len) {
     r->peers[r->my_id].match_index = index;
     r->peers[r->my_id].next_index = index + 1;
 
-
     // single node clusters, just commit since we are quorum
     if (r->num_nodes == 1) {
         r->commit_index = index;
@@ -350,6 +349,11 @@ int raft_propose(raft_t *r, const void *data, size_t len) {
 
     // Send AppendEntries immediately
     raft_send_heartbeats(r);
+
+    // Return the index to caller
+    if (out_index) {
+        *out_index = index;
+    }
 
     return RAFT_OK;
 }
