@@ -154,6 +154,12 @@ int raft_recv_appendentries(raft_t *r,
                 resp->conflict_index = raft_log_find_first_of_term(&r->log, prev_entry->term);
 
                 raft_log_truncate_after(&r->log, req->prev_log_index - 1);
+
+                // FIX: Notify application of log truncation
+                if (r->callbacks.on_log_truncate) {
+                    r->callbacks.on_log_truncate(r->callback_ctx, req->prev_log_index);
+                }
+
                 resp->match_index = req->prev_log_index - 1;
                 return RAFT_OK;
             }
@@ -171,6 +177,12 @@ int raft_recv_appendentries(raft_t *r,
             // Rule 3: If an existing entry conflicts with a new one, delete the existing entry and all that follow it
             if (existing->term != entries[i].term) {
                 raft_log_truncate_after(&r->log, entry_index - 1);
+
+                // FIX: Notify application of log truncation
+                if (r->callbacks.on_log_truncate) {
+                    r->callbacks.on_log_truncate(r->callback_ctx, entry_index);
+                }
+
                 existing = NULL;
             }
         }
@@ -341,7 +353,7 @@ int raft_propose(raft_t *r, const void *data, size_t len, uint64_t *out_index) {
     r->peers[r->my_id].match_index = index;
     r->peers[r->my_id].next_index = index + 1;
 
-    // single node clusters, just commit since we are quorum
+    // single node clusters, just commit since we are the quorum
     if (r->num_nodes == 1) {
         r->commit_index = index;
     }

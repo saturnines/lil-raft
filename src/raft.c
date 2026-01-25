@@ -54,6 +54,10 @@ uint64_t raft_random_election_timeout(raft_t *r) {
 void raft_become_follower(raft_t *r, uint64_t term) {
     if (!r) return;
 
+    // Track previous state for callbacks
+    bool was_leader = (r->state == RAFT_STATE_LEADER);
+    uint64_t old_term = r->current_term;
+
     printf("[Node %d] Became FOLLOWER for term %lu\n", r->my_id, term);
 
     r->state = RAFT_STATE_FOLLOWER;
@@ -76,6 +80,21 @@ void raft_become_follower(raft_t *r, uint64_t term) {
     // Persist term and vote
     if (r->callbacks.persist_vote) {
         r->callbacks.persist_vote(r->callback_ctx, r->current_term, r->voted_for);
+    }
+
+    // Clear pending ReadIndex requests (they're invalid now)
+    raft_readindex_clear_pending(r);
+
+    // FIX: Notify application of term change BEFORE leadership change
+    // This allows the app to invalidate reads before failing writes
+    if (term != old_term && r->callbacks.on_term_change) {
+        r->callbacks.on_term_change(r->callback_ctx, term);
+    }
+
+    // FIX: Notify application of leadership loss
+    // This allows the app to fail pending writes with NOT_LEADER error
+    if (was_leader && r->callbacks.on_leadership_change) {
+        r->callbacks.on_leadership_change(r->callback_ctx, false);
     }
 }
 
@@ -105,6 +124,11 @@ void raft_become_candidate(raft_t *r) {
     // Persist term and vote
     if (r->callbacks.persist_vote) {
         r->callbacks.persist_vote(r->callback_ctx, r->current_term, r->voted_for);
+    }
+
+    // FIX: Notify of term change (candidate increments term)
+    if (r->callbacks.on_term_change) {
+        r->callbacks.on_term_change(r->callback_ctx, r->current_term);
     }
 
     // Send RequestVote to all peers, used in raft_election.c
@@ -137,6 +161,11 @@ void raft_become_leader(raft_t *r) {
         // Reset snapshot transfer state
         r->snapshot_send[i].in_progress = 0;
         r->snapshot_send[i].offset = 0;
+    }
+
+    // FIX: Notify application of leadership gain
+    if (r->callbacks.on_leadership_change) {
+        r->callbacks.on_leadership_change(r->callback_ctx, true);
     }
 
     // Send immediate heartbeat (in raft_replication.c)
