@@ -46,7 +46,7 @@ void raft_tick(raft_t *r);
 // Client Operations
 // ============================================================================
 
-    int raft_propose(raft_t *r, const void *data, size_t len, uint64_t *out_index);
+int raft_propose(raft_t *r, const void *data, size_t len);
 int raft_propose_batch(raft_t *r, const void **entries, const size_t *lengths, size_t count);
 
 // ============================================================================
@@ -139,7 +139,6 @@ uint64_t raft_get_commit_index(const raft_t *r);
 uint64_t raft_get_last_applied(const raft_t *r);
 int raft_get_leader_id(const raft_t *r);
 int raft_get_node_id(const raft_t *r);
-uint64_t raft_get_last_log_index(const raft_t *r);
 
 // ============================================================================
 // Helpers
