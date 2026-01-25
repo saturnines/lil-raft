@@ -416,7 +416,9 @@ uint64_t raft_get_pending_index(const raft_t *r) {
 
     uint64_t last_idx = raft_log_last_index(&r->log);
 
-    // Return last index if ANYTHING is unapplied (committed or not)
+    printf("[RAFT] get_pending_index: last_idx=%lu last_applied=%lu returning=%lu\n",
+           last_idx, r->last_applied, (last_idx > r->last_applied) ? last_idx : 0);
+
     if (last_idx > r->last_applied) {
         return last_idx;
     }
