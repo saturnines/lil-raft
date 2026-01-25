@@ -179,13 +179,6 @@ int raft_recv_readindex(raft_t *r,
         return RAFT_OK;
     }
 
-    // BUG #1: Skip quorum check entirely, just return commit_index
-    // This allows stale reads during partition - a new leader may have
-    // committed new values that we don't know about
-    resp->read_index = r->commit_index;
-    return RAFT_OK;
-
-#if 0  // DISABLED: Correct implementation
     // Single node cluster - respond immediately (we are the quorum)
     if (r->num_nodes == 1) {
         resp->read_index = r->commit_index;
@@ -201,7 +194,6 @@ int raft_recv_readindex(raft_t *r,
 
     // Response will be sent asynchronously after heartbeat quorum
     return RAFT_OK;
-#endif
 }
 
 // ============================================================================

@@ -338,10 +338,7 @@ void raft_tick(raft_t *r) {
     }
 
     // Apply committed entries
-    // BUG #2: Apply ALL entries, not just committed ones
-    // This causes uncommitted data to be visible, which can disappear on leader change
-    uint64_t apply_up_to = raft_log_last_index(&r->log);  // BUG: should be r->commit_index
-    while (r->last_applied < apply_up_to) {
+    while (r->last_applied < r->commit_index) {
         raft_entry_t *entry = raft_log_get(&r->log, r->last_applied + 1);
         if (!entry) {
             break; // allow snap to popup
