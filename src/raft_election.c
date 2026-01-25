@@ -182,9 +182,14 @@ int raft_recv_requestvote(raft_t *r,
         return RAFT_OK;
     }
 
+    // BUG #3: Skip log up-to-date check - grant vote to anyone with higher term
+    // This violates Leader Completeness property: a leader might be elected
+    // that doesn't have all committed entries
+#if 0  // DISABLED: Correct implementation
     if (!log_is_up_to_date(r, req->last_log_term, req->last_log_index)) {
         return RAFT_OK;
     }
+#endif
 
     // Grant vote
     r->voted_for = req->candidate_id;
