@@ -7,7 +7,6 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -439,22 +438,6 @@ typedef struct {
      */
     void (*on_readindex_complete)(void *ctx, uint64_t req_id,
                                    uint64_t index, int err);
-
-    /**
-     * Leadership changed
-     */
-    void (*on_leadership_change)(void *ctx, bool is_leader);
-
-    /**
-     * Term changed
-     */
-    void (*on_term_change)(void *ctx, uint64_t new_term);
-
-    /**
-     * Log truncated due to conflict
-     */
-    void (*on_log_truncate)(void *ctx, uint64_t from_index);
-
 
 } raft_callbacks_t;
 

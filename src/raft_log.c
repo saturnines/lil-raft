@@ -97,7 +97,7 @@ static inline uint64_t offset_to_index(const raft_log_t *log, size_t offset) {
 // ============================================================================
 
 int raft_log_append(raft_log_t *log, uint64_t term,
-                    const void *data, size_t len, uint64_t *out_index) {
+                    const void *data, size_t len) {
     if (!log || !data) {
         return RAFT_ERR_INVALID_ARG;
     }
@@ -126,17 +126,13 @@ int raft_log_append(raft_log_t *log, uint64_t term,
     log->entries[log->count].len = len;
     log->count++;
 
-    if (out_index) {
-        *out_index = index;
-    }
-
     return RAFT_OK;
 }
 
 /**
  * Append a NOOP entry
  */
-int raft_log_append_noop(raft_log_t *log, uint64_t term, uint64_t *out_index) {
+int raft_log_append_noop(raft_log_t *log, uint64_t term) {
     if (!log) {
         return RAFT_ERR_INVALID_ARG;
     }
@@ -158,12 +154,9 @@ int raft_log_append_noop(raft_log_t *log, uint64_t term, uint64_t *out_index) {
     log->entries[log->count].len = 0;
     log->count++;
 
-    if (out_index) {
-        *out_index = index;
-    }
-
     return RAFT_OK;
 }
+
 /**
  * Append an entry preserving its type (used for follower replication)
  */

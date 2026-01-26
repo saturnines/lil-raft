@@ -46,7 +46,7 @@ void raft_tick(raft_t *r);
 // Client Operations
 // ============================================================================
 
-    int raft_propose(raft_t *r, const void *data, size_t len, uint64_t *out_index);
+int raft_propose(raft_t *r, const void *data, size_t len);
 int raft_propose_batch(raft_t *r, const void **entries, const size_t *lengths, size_t count);
 
 // ============================================================================

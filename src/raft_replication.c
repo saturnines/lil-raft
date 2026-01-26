@@ -154,12 +154,6 @@ int raft_recv_appendentries(raft_t *r,
                 resp->conflict_index = raft_log_find_first_of_term(&r->log, prev_entry->term);
 
                 raft_log_truncate_after(&r->log, req->prev_log_index - 1);
-
-                // FIX: Notify application of log truncation
-                if (r->callbacks.on_log_truncate) {
-                    r->callbacks.on_log_truncate(r->callback_ctx, req->prev_log_index);
-                }
-
                 resp->match_index = req->prev_log_index - 1;
                 return RAFT_OK;
             }
@@ -177,12 +171,6 @@ int raft_recv_appendentries(raft_t *r,
             // Rule 3: If an existing entry conflicts with a new one, delete the existing entry and all that follow it
             if (existing->term != entries[i].term) {
                 raft_log_truncate_after(&r->log, entry_index - 1);
-
-                // FIX: Notify application of log truncation
-                if (r->callbacks.on_log_truncate) {
-                    r->callbacks.on_log_truncate(r->callback_ctx, entry_index);
-                }
-
                 existing = NULL;
             }
         }
@@ -313,7 +301,7 @@ int raft_recv_appendentries_response(raft_t *r,
 // Propose (Client Write)
 // ============================================================================
 
-int raft_propose(raft_t *r, const void *data, size_t len, uint64_t *out_index) {
+int raft_propose(raft_t *r, const void *data, size_t len) {
     if (!r) {
         return RAFT_ERR_INVALID_ARG;
     }
@@ -326,12 +314,13 @@ int raft_propose(raft_t *r, const void *data, size_t len, uint64_t *out_index) {
         return RAFT_ERR_NOT_LEADER;
     }
 
-    // Append to in mem log - get index directly
-    uint64_t index;
-    int ret = raft_log_append(&r->log, r->current_term, data, len, &index);
+    // Append to in mem log
+    int ret = raft_log_append(&r->log, r->current_term, data, len);
     if (ret != RAFT_OK) {
         return ret;
     }
+
+    uint64_t index = raft_log_last_index(&r->log);
 
     // Persist via callback
     if (r->callbacks.log_append) {
@@ -353,18 +342,14 @@ int raft_propose(raft_t *r, const void *data, size_t len, uint64_t *out_index) {
     r->peers[r->my_id].match_index = index;
     r->peers[r->my_id].next_index = index + 1;
 
-    // single node clusters, just commit since we are the quorum
+
+    // single node clusters, just commit since we are quorum
     if (r->num_nodes == 1) {
         r->commit_index = index;
     }
 
     // Send AppendEntries immediately
     raft_send_heartbeats(r);
-
-    // Return the index to caller
-    if (out_index) {
-        *out_index = index;
-    }
 
     return RAFT_OK;
 }
@@ -385,21 +370,16 @@ int raft_propose_batch(raft_t *r,
         return RAFT_ERR_NOT_LEADER;
     }
 
-    // Append all entries - track first and last index
-    uint64_t first_index = 0;
-    uint64_t last_index = 0;
-
+    // Append all entries
     for (size_t i = 0; i < count; i++) {
-        uint64_t index;
-        int ret = raft_log_append(&r->log, r->current_term, entries[i], lengths[i], &index);
+        int ret = raft_log_append(&r->log, r->current_term, entries[i], lengths[i]);
         if (ret != RAFT_OK) {
             return ret;
         }
-        if (i == 0) {
-            first_index = index;
-        }
-        last_index = index;
     }
+
+    uint64_t last_index = raft_log_last_index(&r->log);
+    uint64_t first_index = last_index - count + 1;
 
     // Persist all entries
     if (r->callbacks.log_append_batch) {
@@ -453,12 +433,13 @@ int raft_propose_noop(raft_t *r, uint64_t *sync_index) {
         return RAFT_ERR_NOT_LEADER;
     }
 
-    // Append NOOP to in memory log - get index directly
-    uint64_t index;
-    int ret = raft_log_append_noop(&r->log, r->current_term, &index);
+    // Append NOOP to in memory log
+    int ret = raft_log_append_noop(&r->log, r->current_term);
     if (ret != RAFT_OK) {
         return ret;
     }
+
+    uint64_t index = raft_log_last_index(&r->log);
 
     // Persist via callback (NOOP has no data)
     if (r->callbacks.log_append) {
